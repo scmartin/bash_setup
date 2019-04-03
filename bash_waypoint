@@ -1,0 +1,174 @@
+#!/bin/bash/
+#################################
+##                             ##
+##        Waypoint Stuff       ##
+##                             ##
+#################################
+
+
+#################################
+##                             ##
+##          Initialize         ##
+##                             ##
+#################################
+if [ ! -f $HOME/waypoints.txt ];
+then
+   echo ""
+   echo "Welcome to Tal's Waypoint Manager!"
+   echo "Commands:"
+   echo "dp [padname] - Assigns the current working directory to [padname]."
+   echo "showpads - Shows all your current teleport pads."
+   echo "tp [padname] - Teleport to the directory associated with [padname]."
+   echo "cppad [filename] [padname] - Copies file to the directory associated with [padname]"
+   echo "tphelp - Reprints this list of commands and explanations."
+   echo "rmpad [padname] - Deletes the teleport pad [padname]."
+   touch "$HOME"/waypoints.txt
+   chmod 600 "$HOME"/waypoints.txt
+   echo home $PWD >> "$HOME"/waypoints.txt
+fi
+declare -A pads
+declare -a names
+counterr=0
+while IFS='' read -r line || [[ -n "$line" ]]; do
+   counter=0
+   for word in $line; do
+      arr["$counter"]="$word"
+      let "counter=counter+1"
+   done
+   names["$counterr"]="${arr[0]}"
+   pads["${names["$counterr"]}"]="${arr[1]}"
+   let "counterr=counterr+1"
+done < $HOME/waypoints.txt
+
+
+#################################
+##                             ##
+##       Jump to Waypoint      ##
+##                             ##
+#################################
+tp(){
+   a="$1"
+   cd "${pads[${a}]}"
+}
+
+
+#################################
+##                             ##
+##        Set Waypoint         ##
+##                             ##
+#################################
+dp(){
+   a=$1
+   result=0
+   for i in "${names[@]}"; do
+      if [[ "$a" = "$i" ]]; then
+         echo "This name is already in use"
+         echo "Please choose another name"
+         result=1 
+      fi
+   done
+   if [[ "$result" = 0 ]]; then
+      pads["$a"]="$PWD"
+      names+=("$a")
+      IFS=$'\n' sorted=($(sort <<<"${names[*]}"))
+      unset IFS
+      unset names
+      names=("${sorted[@]}")
+      unset sorted
+      rm $HOME/waypoints.txt
+      touch $HOME/waypoints.txt
+      chmod 600 $HOME/waypoints.txt
+      for key in "${!names[@]}"
+      do
+         echo ${names[${key}]} ${pads[${names[${key}]}]} >> $HOME/waypoints.txt
+      done
+      sort $HOME/waypoints.txt -o $HOME/waypoints.txt
+   fi
+}
+
+
+#################################
+##                             ##
+##    Display All Waypoints    ##
+##                             ##
+#################################
+showpads(){
+   for key in "${names[@]}"
+   do
+      echo ${key} ${pads[${key}]}
+   done
+}
+
+
+#################################
+##                             ##
+##      Copy to Waypoint       ##
+##                             ##
+#################################
+cppad() {
+   a=$1
+   b=$2
+   cp -r $a ${pads[${b}]}
+}
+
+
+#################################
+##                             ##
+##       List of Commands      ##
+##                             ##
+#################################
+tphelp(){
+   echo "Commands:"
+   echo "dp [padname] - Assigns the current working directory to [padname]."
+   echo "showpads - Shows all your current teleport pads."
+   echo "tp [padname] - Teleport to the directory associated with [padname]."
+   echo "cppad [filename] [padname] - Copies file to the directory associated with [padname]"
+   echo "tphelp - Reprints this list of commands and explanations."
+   echo "rmpad [padname] - Deletes the teleport pad [padname]."
+}
+
+
+##################################
+###                             ##
+###       Delete Waypoint       ##
+###                             ##
+##################################
+rmpad(){
+   a="$1"
+   for i in "${!names[@]}"; do
+      if [[ "${names[$i]}" = "$a" ]]; then
+         unset pads[${a}]
+         unset names[$i]
+      fi
+   done
+   names=("${names[@]}")
+   rm $HOME/waypoints.txt
+   touch $HOME/waypoints.txt
+   chmod 600 $HOME/waypoints.txt
+   for key in "${!names[@]}"
+   do
+      echo ${names[${key}]} ${pads[${names[${key}]}]} >> $HOME/waypoints.txt
+   done
+}
+
+
+##################################
+###                             ##
+###   Autocomplete pad names    ##
+###                             ##
+##################################
+_foo() 
+{
+    local cur prev opts
+    COMPREPLY=()
+    cur="${COMP_WORDS[COMP_CWORD]}"
+    prev="${COMP_WORDS[COMP_CWORD-1]}"
+    opts=$(awk 'BEGIN {ORS=" "} {print $1}' ~/waypoints.txt)
+    
+    if [[ ${cur} == * ]] ; then
+        COMPREPLY=( $(compgen -W "${opts}" "${cur}") )
+        return 0
+    fi
+}
+complete -F _foo rmpad
+complete -F _foo tp
